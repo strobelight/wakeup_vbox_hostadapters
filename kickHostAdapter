@@ -1,0 +1,24 @@
+#!/bin/bash
+
+#############################################################################
+#
+#   Bash shell script to run on linux containing VirtualBox VMs configured
+#   with host-only network adapters, that will kick them in the butt (stop/start)
+#   when those VMs won't talk to each other after the host has woken up from
+#   sleep.
+#
+#############################################################################
+
+HostAdapterNames=$(VBoxManage list hostonlyifs | grep "^Name:" | awk '{print $2}')
+#echo $HostAdapterNames
+
+RunningVMs=$(VBoxManage list runningvms | tr '{}' '""' | awk -F '"' '{print $4}')
+#echo $RunningVMs
+
+for v in $RunningVMs; do
+    for hostadapter in $HostAdapterNames; do
+        Nic=$(VBoxManage showvminfo "$v" | grep $hostadapter | sed 's/:.*//;s/^.* //')
+        VBoxManage controlvm "$v" setlinkstate${Nic} off
+        VBoxManage controlvm "$v" setlinkstate${Nic} on
+    done
+done
