@@ -10,14 +10,24 @@
 #############################################################################
 
 HostAdapterNames=$(VBoxManage list hostonlyifs | grep "^Name:" | awk '{print $2}')
-#echo $HostAdapterNames
+if [ -n "$HostAdapterNames" ]; then
+    echo "Found host-only interface: $HostAdapterNames"
+else
+    echo "No host-only interface found"
+    exit
+fi
 
 RunningVMs=$(VBoxManage list runningvms | tr '{}' '""' | awk -F '"' '{print $4}')
-#echo $RunningVMs
+
+if [ -z "$RunningVMs" ]; then
+    echo "No running VMs found"
+    exit
+fi
 
 for v in $RunningVMs; do
     for hostadapter in $HostAdapterNames; do
         Nic=$(VBoxManage showvminfo "$v" | grep $hostadapter | sed 's/:.*//;s/^.* //')
+        echo "Toggling state of $hostadapter found on NIC $Nic for VM id $v"
         VBoxManage controlvm "$v" setlinkstate${Nic} off
         VBoxManage controlvm "$v" setlinkstate${Nic} on
     done
