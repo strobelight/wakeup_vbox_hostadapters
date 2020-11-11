@@ -27,8 +27,36 @@ fi
 for v in $RunningVMs; do
     for hostadapter in $HostAdapterNames; do
         Nic=$(VBoxManage showvminfo "$v" | grep $hostadapter | sed 's/:.*//;s/^.* //')
-        echo "Toggling state of $hostadapter found on NIC $Nic for VM id $v"
-        VBoxManage controlvm "$v" setlinkstate${Nic} off
-        VBoxManage controlvm "$v" setlinkstate${Nic} on
+        if [ -z "$Nic" ]; then
+            Nic=$(VBoxManage showvminfo "$v" | grep "^NIC" | grep -v disabled | awk '
+                BEGIN {
+                    NicInUse = 1
+                    NicPresent = 2
+                }
+                /Settings:/ {
+                    NicState[$2+0] = NicInUse
+                    next
+                }
+                /MAC:/ {
+                    NicState[$2+0] = NicPresent
+                }
+                END {
+                    for (nicIndex in NicState) {
+                        if (NicState[nicIndex] == NicPresent) {
+                            printf("%d\n",nicIndex)
+                        }
+                    }
+                }
+                ')
+        fi
+        if [ -n "$Nic" ]; then
+            echo "Toggling state of $hostadapter found on NIC $Nic for VM id $v"
+            VBoxManage controlvm "$v" nic${Nic} null
+            VBoxManage controlvm "$v" nic${Nic} hostonly $hostadapter
+            VBoxManage controlvm "$v" setlinkstate${Nic} off
+            VBoxManage controlvm "$v" setlinkstate${Nic} on
+        else
+            echo "Manual intervention required to re-establish $hostadapter on a NIC"
+        fi
     done
 done
